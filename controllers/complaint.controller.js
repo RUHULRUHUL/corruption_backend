@@ -20,11 +20,19 @@ const toPostMedia = (files, externalUrl) => [
   ...(externalUrl ? [{ kind: "external_video", externalUrl: externalUrl }] : [])
 ];
 
-const mapMedia = (mediaRows = []) =>
+const getMediaUrl = (req, storagePath) => {
+  if (!storagePath) return null;
+  const relativePath = storagePath.replace(/^[/\\]+/, "");
+  const baseUrl = (process.env.API_BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+  return `${baseUrl}/${relativePath}`;
+};
+
+const mapMedia = (req, mediaRows = []) =>
   mediaRows.map((item) => ({
     id: item.id,
     kind: item.kind,
     storage_path: item.storage_path,
+    media_url: getMediaUrl(req, item.storage_path),
     external_url: item.external_url,
     original_name: item.original_name,
     mime_type: item.mime_type,
@@ -135,7 +143,63 @@ exports.getAllComplaints = async (req, res) => {
         full_name: post.author_name,
         avatar_url: post.avatar_url
       },
-      media: mapMedia(mediaByPostId.get(post.id) || [])
+      media: mapMedia(req, mediaByPostId.get(post.id) || [])
+    }));
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.getMyComplaints = async (req, res) => {
+  try {
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+    const offset = (page - 1) * limit;
+
+    const [posts] = await db.execute(
+      `SELECT p.id, p.public_id, p.title, p.body, p.created_at, p.updated_at,
+              u.uuid AS author_uuid, u.full_name AS author_name, u.avatar_url
+       FROM posts p
+       LEFT JOIN users u ON u.id = p.author_id
+       WHERE p.status = 'published' AND p.author_id = ?
+       ORDER BY p.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [req.user.id, limit, offset]
+    );
+
+    if (!posts || posts.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const ids = posts.map((post) => post.id);
+    const placeholders = ids.map(() => "?").join(", ");
+    const [mediaRows] = await db.execute(
+      `SELECT * FROM post_media WHERE post_id IN (${placeholders}) ORDER BY created_at DESC`,
+      ids
+    );
+
+    const mediaByPostId = new Map();
+    for (const media of mediaRows) {
+      const list = mediaByPostId.get(media.post_id) || [];
+      list.push(media);
+      mediaByPostId.set(media.post_id, list);
+    }
+
+    const data = posts.map((post) => ({
+      id: post.id,
+      public_id: post.public_id,
+      title: post.title,
+      body: post.body,
+      created_at: post.created_at,
+      updated_at: post.updated_at,
+      author: {
+        uuid: post.author_uuid,
+        full_name: post.author_name,
+        avatar_url: post.avatar_url
+      },
+      media: mapMedia(req, mediaByPostId.get(post.id) || [])
     }));
 
     return res.json({ success: true, data });

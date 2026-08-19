@@ -2,6 +2,18 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const Posts = require("../models/post.model");
 
+const getMediaUrl = (req, storagePath) => {
+  if (!storagePath) return null;
+  const relativePath = storagePath.replace(/^[/\\]+/, "");
+  const baseUrl = (process.env.API_BASE_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+  return `${baseUrl}/${relativePath}`;
+};
+
+const mapMedia = (req, item) => ({
+  ...item,
+  media_url: getMediaUrl(req, item.storage_path)
+});
+
 const asMedia = (files, externalUrl) => [
   ...(files || []).map((file) => ({ kind: file.mimetype.startsWith("image/") ? "image" : file.mimetype.startsWith("video/") ? "video" : "document", storagePath: `/${file.path.replace(/\\/g, "/")}`, originalName: file.originalname, mimeType: file.mimetype, sizeBytes: file.size })),
   ...(externalUrl ? [{ kind: "external_video", externalUrl }] : [])
@@ -22,7 +34,10 @@ exports.list = async (req, res, next) => {
     const viewerId = req.user?.id ?? null;
     res.json({
       success: true,
-      data: await Posts.list({ userId: viewerId, page, limit }),
+      data: (await Posts.list({ userId: viewerId, page, limit })).map((post) => ({
+        ...post,
+        media: post.media.map((item) => mapMedia(req, item))
+      })),
       meta: { page, limit }
     });
   } catch (error) { next(error); }

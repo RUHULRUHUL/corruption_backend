@@ -6,6 +6,7 @@ const controller = require("../controllers/complaint.controller");
 const { requireAuth } = require("../middleware/auth");
 
 router.get("/getAllComplaints", controller.getAllComplaints);
+router.get("/myComplaints", requireAuth, controller.getMyComplaints);
 router.post("/submitComplain", requireAuth, upload.any(), controller.submitComplain);
 
 module.exports = router;
