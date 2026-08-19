@@ -24,6 +24,17 @@ exports.login = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+exports.adminLogin = async (req, res, next) => {
+  try {
+    const user = await Users.findByEmail((req.body.email || "").toLowerCase());
+    if (!user || user.role !== "admin" || user.account_status !== "active" || !(await bcrypt.compare(req.body.password || "", user.password_hash))) {
+      return res.status(401).json({ success: false, message: "Invalid admin email or password" });
+    }
+    const safeUser = await Users.findSafeById(user.id);
+    res.json({ success: true, data: { user: safeUser, token: issueToken(safeUser) } });
+  } catch (error) { next(error); }
+};
+
 exports.createAdmin = async (req, res, next) => {
   try {
     const setupKey = req.headers["x-admin-setup-key"];

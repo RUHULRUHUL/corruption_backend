@@ -9,6 +9,7 @@ Create the MySQL database named in `.env`, set `ADMIN_SETUP_KEY` to a private va
 ## Main API
 
 - `POST /api/auth/register`, `POST /api/auth/login`
+- `POST /api/auth/admin/login` for admin-only login
 - `POST /api/reports` (multipart field: `evidence`), `GET /api/reports/mine`
 - `GET /api/reports/admin`, `PATCH /api/reports/:publicId/review` (admin only)
 - `POST /api/posts` (multipart field: `media`), `GET /api/posts`, plus reactions and comments
