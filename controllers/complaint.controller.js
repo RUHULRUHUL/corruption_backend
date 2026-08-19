@@ -74,7 +74,9 @@ exports.submitComplain = async (req, res) => {
       publicId,
       authorId: req.user.id,
       title: finalTitle,
-      body: bodyText
+      body: bodyText,
+      postType: "complaint",
+      status: "pending_review"
     }, media);
 
     return res.status(201).json({
@@ -85,7 +87,8 @@ exports.submitComplain = async (req, res) => {
         public_id: publicId,
         title: finalTitle,
         body: bodyText,
-        author_id: req.user.id
+        author_id: req.user.id,
+        status: "pending_review"
       }
     });
   } catch (error) {
@@ -163,7 +166,7 @@ exports.getMyComplaints = async (req, res) => {
               u.uuid AS author_uuid, u.full_name AS author_name, u.avatar_url
        FROM posts p
        LEFT JOIN users u ON u.id = p.author_id
-       WHERE p.status = 'published' AND p.author_id = ?
+      WHERE p.post_type = 'complaint' AND p.author_id = ?
        ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`,
       [req.user.id, limit, offset]

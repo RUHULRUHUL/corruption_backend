@@ -5,8 +5,8 @@ exports.create = async (post, media) => {
   try {
     await connection.beginTransaction();
     const [result] = await connection.execute(
-      "INSERT INTO posts (public_id, author_id, title, body) VALUES (?, ?, ?, ?)",
-      [post.publicId, post.authorId, post.title, post.body]
+      "INSERT INTO posts (public_id, author_id, title, body, post_type, status) VALUES (?, ?, ?, ?, ?, ?)",
+      [post.publicId, post.authorId, post.title, post.body, post.postType || "post", post.status || "published"]
     );
     for (const item of media) {
       await connection.execute(

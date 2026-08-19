@@ -101,12 +101,41 @@ const ensureDatabaseSchema = async () => {
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             public_id CHAR(36) NOT NULL UNIQUE,
             author_id BIGINT UNSIGNED NOT NULL,
+            title VARCHAR(255) NOT NULL,
             body TEXT NOT NULL,
-            status ENUM('published','hidden','deleted') NOT NULL DEFAULT 'published',
+            post_type ENUM('post','complaint') NOT NULL DEFAULT 'post',
+            status ENUM('pending_review','published','hidden','cancelled','deleted') NOT NULL DEFAULT 'pending_review',
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             CONSTRAINT fk_posts_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE,
             INDEX idx_posts_feed (status, created_at)
+        );
+
+        CREATE TABLE IF NOT EXISTS complaint_approvals (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            post_id BIGINT UNSIGNED NOT NULL,
+            admin_id BIGINT UNSIGNED NOT NULL,
+            action ENUM('approved','cancelled','forwarded') NOT NULL,
+            target_team ENUM('security_team','action_team') NULL,
+            note TEXT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT fk_complaint_approval_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+            CONSTRAINT fk_complaint_approval_admin FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE RESTRICT,
+            INDEX idx_complaint_approvals_post_created (post_id, created_at)
+        );
+
+        CREATE TABLE IF NOT EXISTS notifications (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            recipient_id BIGINT UNSIGNED NOT NULL,
+            post_id BIGINT UNSIGNED NULL,
+            type VARCHAR(50) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            read_at DATETIME NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT fk_notifications_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+            CONSTRAINT fk_notifications_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+            INDEX idx_notifications_recipient_created (recipient_id, created_at)
         );
 
         CREATE TABLE IF NOT EXISTS post_media (
@@ -153,6 +182,11 @@ const ensureDatabaseSchema = async () => {
     const connection = await pool.getConnection();
     try {
         await connection.query(schemaSql);
+        await connection.query("ALTER TABLE posts ADD COLUMN IF NOT EXISTS title VARCHAR(255) NULL AFTER author_id");
+        await connection.query("UPDATE posts SET title = LEFT(body, 255) WHERE title IS NULL OR title = ''");
+        await connection.query("ALTER TABLE posts MODIFY COLUMN title VARCHAR(255) NOT NULL");
+        await connection.query("ALTER TABLE posts ADD COLUMN IF NOT EXISTS post_type ENUM('post','complaint') NOT NULL DEFAULT 'post' AFTER body");
+        await connection.query("ALTER TABLE posts MODIFY COLUMN status ENUM('pending_review','published','hidden','cancelled','deleted') NOT NULL DEFAULT 'pending_review'");
     } finally {
         connection.release();
     }

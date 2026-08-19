@@ -23,3 +23,24 @@ exports.login = async (req, res, next) => {
     res.json({ success: true, data: { user: safeUser, token: issueToken(safeUser) } });
   } catch (error) { next(error); }
 };
+
+exports.createAdmin = async (req, res, next) => {
+  try {
+    const setupKey = req.headers["x-admin-setup-key"];
+    if (!process.env.ADMIN_SETUP_KEY || setupKey !== process.env.ADMIN_SETUP_KEY) {
+      return res.status(403).json({ success: false, message: "Admin setup key is required" });
+    }
+
+    const { fullName, email, password } = req.body;
+    if (!fullName || !email || !password || password.length < 8) {
+      return res.status(400).json({ success: false, message: "fullName, email and an 8-character password are required" });
+    }
+    const normalizedEmail = email.toLowerCase();
+    if (await Users.findByEmail(normalizedEmail)) return res.status(409).json({ success: false, message: "Email already registered" });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const [result] = await Users.create({ uuid: uuidv4(), fullName, email: normalizedEmail, passwordHash, role: "admin" });
+    const user = await Users.findSafeById(result.insertId);
+    res.status(201).json({ success: true, data: { user, token: issueToken(user) } });
+  } catch (error) { next(error); }
+};

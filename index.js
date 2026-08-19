@@ -24,6 +24,7 @@ const authRoutes = require("./routes/auth.route");
 const reportRoutes = require("./routes/report.route");
 const postRoutes = require("./routes/post.route");
 const complaintRoutes = require("./routes/complaint.route");
+const adminRoutes = require("./routes/admin.route");
 const { notFound, errorHandler } = require("./middleware/error");
 
 
@@ -31,6 +32,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api", complaintRoutes);
+app.use("/api/admin", adminRoutes);
 app.get("/health", (req, res) => res.json({ success: true, status: "ok" }));
 app.use(notFound);
 app.use(errorHandler);
