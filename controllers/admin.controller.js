@@ -43,8 +43,12 @@ exports.listComplaints = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-exports.reviewComplaint = async (req, res, next) => {
-  const { action, targetTeam, note } = req.body;
+exports.reviewPost = async (req, res, next) => {
+  const { postId, adminId, action, reason, targetTeam } = req.body;
+  const note = reason || req.body.note;
+  const requestedPostId = postId === undefined ? null : Number(postId);
+  if (postId !== undefined && (!Number.isInteger(requestedPostId) || requestedPostId < 1)) return res.status(400).json({ success: false, message: "postId must be a positive integer" });
+  if (adminId !== undefined && Number(adminId) !== Number(req.user.id)) return res.status(403).json({ success: false, message: "adminId must match the authenticated admin" });
   if (!allowedActions.has(action)) return res.status(400).json({ success: false, message: "action must be approved, cancelled or forwarded" });
   if (action === "forwarded" && targetTeam !== "security_team") return res.status(400).json({ success: false, message: "targetTeam must be security_team when forwarding" });
   if ((action === "cancelled" || action === "forwarded") && !note) return res.status(400).json({ success: false, message: "note is required for cancellation or forwarding" });
@@ -52,11 +56,14 @@ exports.reviewComplaint = async (req, res, next) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [posts] = await connection.execute("SELECT id, public_id, title, status FROM posts WHERE public_id = ? AND status <> 'deleted' FOR UPDATE", [req.params.publicId]);
+    const postQuery = requestedPostId
+      ? ["SELECT id, public_id, title, status FROM posts WHERE id = ? AND status <> 'deleted' FOR UPDATE", [requestedPostId]]
+      : ["SELECT id, public_id, title, status FROM posts WHERE public_id = ? AND status <> 'deleted' FOR UPDATE", [req.params.publicId]];
+    const [posts] = await connection.execute(...postQuery);
     const post = posts[0];
     if (!post) {
       await connection.rollback();
-      return res.status(404).json({ success: false, message: "Complaint not found" });
+      return res.status(404).json({ success: false, message: "Post not found" });
     }
 
     const nextStatus = action === "cancelled" ? "cancelled" : "published";

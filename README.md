@@ -1,5 +1,7 @@
 # Anti-Corruption Prevent Platform API
 
+Admin post review: `POST /api/admin/posts/review` with `{ "postId": 1, "adminId": 2, "action": "approved" }` or `{ "postId": 1, "adminId": 2, "action": "cancelled", "reason": "reason" }`. Use `Authorization: Bearer <admin-token>`; `adminId` must match the authenticated admin. Existing PATCH review URLs remain supported.
+
 This refactor keeps confidential reports separate from public community posts. Report evidence is never exposed by a static `uploads` directory.
 
 ## Setup
